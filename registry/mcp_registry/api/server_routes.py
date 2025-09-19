@@ -44,20 +44,14 @@ async def mcp_register_service(
     supportedFormats: Annotated[str, Form()] = "[]",  # JSON 문자열 형태로 받음
     tags: Annotated[str, Form()] = "[]",             # JSON 문자열 형태로 받음
     environment: Annotated[str, Form()] = "production",
+
 ):
     from ..search.service import faiss_service
 
     logger.info(f"***Name: {name}, URL: {serverUrl}")
 
-    # 1. URL 파싱
-    parsed = urlparse(serverUrl)
-    # 2. 호스트명 추출
-    hostname = parsed.hostname or ""
-    # 3. 첫 번째 레벨 도메인 추출
-    first_level = hostname.split(".")[0] if hostname else ""
-    # 4. 최종 path 생성
-    path = f"/{name}/{first_level}"
-
+    # 1. 최종 path 생성
+    path = uuid.uuid4()
 
 
     # 기존 저장
@@ -115,6 +109,8 @@ async def mcp_register_service(
     # Regenerate Nginx configuration
 
     # Broadcast health status update to WebSocket clients
+
+    # enable true 가  default 인 과정
 
     return JSONResponse(
         status_code=201,
