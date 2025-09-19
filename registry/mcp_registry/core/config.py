@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     # Container paths - adjust for local development
     container_app_dir: Path = Path("/app")
 #    container_registry_dir: Path = Path("/app/registry")
-    container_registry_dir: Path = Path("/app/mcp_registry")
+    container_registry_dir: Path = Path("/app/registry/mcp_registry")
     container_log_dir: Path = Path("/app/logs")
     
     # Local development mode detection
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     @property
     def servers_dir(self) -> Path:
         if self.is_local_dev:
-            return Path.cwd() / "mcp_registry" / "servers" # Path.cwd() / "registry" / "servers"
+            return Path.cwd() / "registry" / "mcp_registry" / "servers" # 기존: Path.cwd() / "registry" / "servers"
         return self.container_registry_dir / "servers"
 
     @property
