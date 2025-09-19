@@ -37,7 +37,6 @@ services:
       - /opt/ssl:/etc/ssl
       - /var/log/mcp-gateway:/app/logs
       - /opt/mcp-gateway/auth_server/scopes.yml:/app/auth_server/scopes.yml
-      - /opt/mcp-gateway/registry:/app/registry
     depends_on:
       - auth-server
     restart: unless-stopped
