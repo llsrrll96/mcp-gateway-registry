@@ -46,6 +46,7 @@ class ServerService:
 
     def save_server_to_file(self, server_info: Dict[str, Any]) -> bool:
         """Save server data to individual file."""
+        logger.info(f"***********************save_server_to_file,server_info: {server_info}")
         try:
             # Create servers directory if it doesn't exist
             settings.servers_dir.mkdir(parents=True, exist_ok=True)
@@ -64,6 +65,15 @@ class ServerService:
             logger.error(f"Failed to save server '{server_info.get('name', 'UNKNOWN')}' data to {filename}: {e}",
                          exc_info=True)
             return False
+
+    def _path_to_filename(self, path: str) -> str:
+        """Convert a path to a safe filename."""
+        # Remove leading slash and replace remaining slashes with underscores
+        normalized = path.lstrip("/").replace("/", "_")
+        # Append .json extension if not present
+        if not normalized.endswith(".json"):
+            normalized += ".json"
+        return normalized
 
 # Global service instance
 server_service = ServerService()

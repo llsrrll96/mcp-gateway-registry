@@ -9,10 +9,11 @@ from fastapi.templating import Jinja2Templates
 import httpx
 from urllib.parse import urlparse
 import uuid
-
+from pydantic import BaseModel
+from typing import List, Dict, Optional
 
 # from ..core.config import settings
-# from ..auth.dependencies import web_auth, api_auth, enhanced_auth
+from ...auth.dependencies import web_auth, api_auth, enhanced_auth
 # from ..services.server_service import server_service
 
 from ..services.server_service import server_service
@@ -21,78 +22,87 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/mcp", name="servers")
+class MCPRegisterRequest(BaseModel):
+    name: str
+    version: Optional[str] = "1.0"
+    description: Optional[str] = ""
+    status: Optional[str] = "active"
+    type: Optional[str] = "analysis"
+    scope: Optional[str] = "external"
+    migrationStatus: Optional[str] = "none"
+    serverUrl: str
+    protocol: Optional[str] = "http"
+    security: Optional[Dict] = {}
+    supportedFormats: Optional[List[str]] = []
+    tags: Optional[List[str]] = []
+    environment: Optional[str] = "production"
+
+
+@router.get("/mcp", name="servers")
 async def get_servers_json():
+    logger.info(f"get_servers_json")
     all_servers = server_service.get_all_servers()
 
 
-    from registry.health.service import health_service
+    return {"data" : all_servers}
 
 
 @router.post("/mcp", name="mcp_register")
 async def mcp_register_service(
-    name: Annotated[str, Form()],
-    version: Annotated[str, Form()] = "1.0",
-    description: Annotated[str, Form()] = "",
-    status: Annotated[str, Form()] = "active",
-    type: Annotated[str, Form()] = "analysis",
-    scope: Annotated[str, Form()] = "external",
-    migrationStatus: Annotated[str, Form()] = "none",
-    serverUrl: Annotated[str, Form()] = "",
-    protocol: Annotated[str, Form()] = "http",
-    security: Annotated[str, Form()] = "{}",
-    supportedFormats: Annotated[str, Form()] = "[]",  # JSON 문자열 형태로 받음
-    tags: Annotated[str, Form()] = "[]",             # JSON 문자열 형태로 받음
-    environment: Annotated[str, Form()] = "production",
-
+        body: MCPRegisterRequest,
+        user_context: dict = Depends(enhanced_auth)
 ):
     from ..search.service import faiss_service
 
-    logger.info(f"***Name: {name}, URL: {serverUrl}")
+    logger.info(f"***Name: {body.name}, URL: {body.serverUrl}")
 
     # 1. 최종 path 생성
-    path = uuid.uuid4()
+    # 전체 UUID 생성
+    raw_uuid = uuid.uuid4()
+    clean_uuid = str(raw_uuid).replace('-',"")
 
+    # 하이픈 기준으로 첫 번째 부분만 사용
+    path = f"/{clean_uuid}"
+
+    tag_str = ",".join(tag.strip() for tag in body.tags)
+    logger.info(f"***tag_str: {tag_str}")
 
     # 기존 저장
     from registry.api.server_routes import register_service
-        # form 데이터 준비
     # register_service 호출 (HTTP 호출이 아니라 내부 함수 호출)
     await register_service(
-        name=name,
-        description=description,
+        name=body.name,
+        description=body.description,
         path=path,
-        proxy_pass_url=serverUrl,
-        tags=tags,
+        proxy_pass_url=body.serverUrl,
+        tags=tag_str,
         num_tools=0,
         num_stars=0,
         is_python=False,
         license_str="N/A",
-        user_context= None,
+        user_context= user_context
     )
 
-    # Process tags
-    tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-    id = uuid.uuid4()
+    id = str(raw_uuid)
 
     # Create server entry
     server_entry = {
         "id": id,
-        "name": name,
-        "version": version,
-        "description": description,
-        "status": status,
-        "type": type,
-        "scope": scope,
-        "migrationStatus": migrationStatus,
-        "serverUrl": serverUrl,
-        "protocol": protocol,
-        "security": security,
-        "supportedFormats": supportedFormats,
-        "tags": tag_list,
-        "environment": environment,
+        "name": body.name,
+        "version": body.version,
+        "description": body.description,
+        "status": body.status,
+        "type": body.type,
+        "scope": body.scope,
+        "migrationStatus": body.migrationStatus,
+        "serverUrl": body.serverUrl,
+        "protocol": body.protocol,
+        "security": body.security,
+        "supportedFormats": body.supportedFormats,
+        "tags": body.tags,
+        "environment": body.environment,
         "tool_list": [],
-        "path": path
+        "path": path,
     }
 
     # Register the server
@@ -110,7 +120,19 @@ async def mcp_register_service(
 
     # Broadcast health status update to WebSocket clients
 
-    # enable true 가  default 인 과정
+    # enable true 가  default 인 과정 - active
+    from registry.api.server_routes import toggle_service_route
+    response: JSONResponse = await toggle_service_route(
+        request=None,
+        service_path=path,
+        enabled="on",  # Form 데이터 대체
+        user_context=user_context,
+    )
+    if response.status_code == 200:
+        logger.info("요청 성공:", response.body.decode())
+        # tool_list 를 가져와서 , servers json 에 채우기
+    else:
+        logger.info("요청 실패:", response.status_code)
 
     return JSONResponse(
         status_code=201,
