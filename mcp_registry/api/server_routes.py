@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+@router.post("/mcp", name="servers")
+async def get_servers_json():
+    all_servers = server_service.get_all_servers()
+
+
+    from registry.health.service import health_service
+
+
 @router.post("/mcp", name="mcp_register")
 async def mcp_register_service(
     name: Annotated[str, Form()],
@@ -57,7 +65,6 @@ async def mcp_register_service(
         # form 데이터 준비
     # register_service 호출 (HTTP 호출이 아니라 내부 함수 호출)
     await register_service(
-        id=uuid.uuid4(),
         name=name,
         description=description,
         path=path,
@@ -72,10 +79,12 @@ async def mcp_register_service(
 
     # Process tags
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    id = uuid.uuid4()
 
     # Create server entry
     server_entry = {
-        "server_name": name,
+        "id": id,
+        "name": name,
         "version": version,
         "description": description,
         "status": status,
