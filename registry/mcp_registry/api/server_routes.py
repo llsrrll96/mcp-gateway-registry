@@ -14,8 +14,6 @@ from typing import List, Dict, Optional
 
 # from ..core.config import settings
 from ...auth.dependencies import web_auth, api_auth, enhanced_auth
-# from ..services.server_service import server_service
-
 from ..services.server_service import server_service
 
 logger = logging.getLogger(__name__)
@@ -70,7 +68,7 @@ async def mcp_register_service(
     # 기존 저장
     from registry.api.server_routes import register_service
     # register_service 호출 (HTTP 호출이 아니라 내부 함수 호출)
-    await register_service(
+    response: JSONResponse = await register_service(
         name=body.name,
         description=body.description,
         path=path,
@@ -82,6 +80,19 @@ async def mcp_register_service(
         license_str="N/A",
         user_context= user_context
     )
+    if response.status_code != 201:
+        try:
+            body_json = json.loads(response.body.decode())
+            message_content = body_json.get("error") if isinstance(body_json, dict) else str(body_json)
+        except Exception:
+            message_content = "failed to regist server"
+        return JSONResponse(
+            status_code=response.status_code,
+            content={
+                "success": False,
+                "message": message_content
+            }
+        )
 
     id = str(raw_uuid)
 
@@ -111,7 +122,7 @@ async def mcp_register_service(
     if not success:
         return JSONResponse(
             status_code=400,
-            content={"error": f"Service failed to save"},
+            content={"success": False, "message": f"Service failed to save"},
         )
 
     # Add to FAISS index (disabled by default) -- X
@@ -129,15 +140,21 @@ async def mcp_register_service(
         user_context=user_context,
     )
     if response.status_code == 200:
-        logger.info("요청 성공:", response.body.decode())
+        logger.info(f"enable 성공: {response.body.decode()}")
         # tool_list 를 가져와서 , servers json 에 채우기
+        # MCP 서버에서 최신 tool 목록 가져오기
+
+        # 기존 서버 정보와 비교
+
+        # 변경된 경우 서버 정보 갱신
+
     else:
-        logger.info("요청 실패:", response.status_code)
+        logger.error(f"enable 실패: '{response.status_code}', off 로 설정", )
 
     return JSONResponse(
         status_code=201,
         content={
-            "message": "Service registered successfully",
-            "service": server_entry,
+            "success": True,
+            "data": server_entry
         },
     )
