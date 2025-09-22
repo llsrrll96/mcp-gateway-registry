@@ -38,12 +38,25 @@ class MCPRegisterRequest(BaseModel):
 
 @router.get("/mcp", name="servers")
 async def get_servers_json():
-    logger.info(f"get_servers_json")
+
     all_servers = server_service.get_all_servers()
+    logger.info(f"get_servers_json: {all_servers}") # {'/a0d063b92a384691bc4bce3986e5f8af': == key가 path로 반환됨
+
+    # path와 서버 정보를 합쳐서 리스트로 만들기
+    service_data = []
+    for path, info in all_servers.items():
+        entry = info.copy()
+        entry['path'] = path
+        service_data.append(entry)
 
 
-    return {"data" : all_servers}
-
+    return JSONResponse(
+        status_code=200,
+        content={
+            "success": True,
+            "data": service_data
+        }
+    )
 
 @router.post("/mcp", name="mcp_register")
 async def mcp_register_service(
@@ -94,11 +107,11 @@ async def mcp_register_service(
             }
         )
 
-    id = str(raw_uuid)
+    server_id = clean_uuid
 
     # Create server entry
     server_entry = {
-        "id": id,
+        "id": server_id,
         "name": body.name,
         "version": body.version,
         "description": body.description,
@@ -158,3 +171,138 @@ async def mcp_register_service(
             "data": server_entry
         },
     )
+
+
+@router.get("/mcp/{server_id}")
+async def get_server_details(
+    server_id: str,
+):
+    # Get servers based
+    server_info = server_service.get_server_info(server_id)
+    logger.info(f"get_server_details: {server_info}")
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": server_info
+        }
+    )
+
+@router.put("/mcp/{server_id}")
+async def edit_server_submit(
+    server_id: str,
+    body: MCPRegisterRequest
+):
+    server_info = server_service.get_server_info(server_id)
+    logger.info(f"edit_server_submit: {server_info}")
+
+    # Prepare updated server data
+    updated_server_entry = {
+        "id": server_id,
+        "name": body.name,
+        "version": body.version,
+        "description": body.description,
+        "status": body.status,
+        "type": body.type,
+        "scope": body.scope,
+        "migrationStatus": body.migrationStatus,
+        "serverUrl": body.serverUrl,
+        "protocol": body.protocol,
+        "security": body.security,
+        "supportedFormats": body.supportedFormats,
+        "tags": body.tags,
+        "environment": body.environment,
+        "path": server_info["path"]
+    }
+
+    # Update server
+    success = server_service.update_server(server_id, updated_server_entry)
+    logger.info(f"success: {success}")
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to save updated server data"
+            }
+        )
+
+    logger.info(f"Server '{body.name}' ({server_info["id"]}) updated '")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": server_info
+        }
+    )
+
+@router.delete("/mcp/{server_id}")
+async def edit_server_submit(
+    server_id: str
+):
+    """기존에 없는 api"""
+    server_info = server_service.get_server_info(server_id)
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service path not found"
+            }
+        )
+
+    # Delete server
+    success = server_service.delete_server(server_id)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to save updated server data"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "MCP deleted successfully"
+        }
+    )
+
+    # nginx 등은 나중에 ..
+
+
+# /api/tools/{service_path}
+@router.get("/mcp/{server_id}/tools")
+async def get_server_details(
+    server_id: str,
+):
+    """Get tool list for a service"""
+    # Handle specific server case - fetch live tools from MCP server
+    server_info = server_service.get_server_info(server_id)
+    if not server_info:
+        raise HTTPException(status_code=404,
+                            detail="Service path not registered")
+
+    # Check if service is enabled and healthy
+    # is_enabled = server_service.is_service_enabled(server_id)
+    # if not is_enabled:
+    #     raise HTTPException(status_code=400, detail="Cannot fetch tools from disabled service")
+
+    server_url = server_info.get("serverUrl")
+    if not server_url:
+        raise HTTPException(status_code=500, detail="Service has no server_url configured")
+
+    logger.info(f"Fetching live tools for {server_id} from {server_url}")
+    # try: ..
