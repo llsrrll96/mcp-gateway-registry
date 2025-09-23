@@ -61,8 +61,7 @@ async def get_servers_json():
 
 @router.post("/mcp", name="mcp_register")
 async def mcp_register_service(
-        body: MCPRegisterRequest,
-        user_context: dict = Depends(enhanced_auth)
+        body: MCPRegisterRequest
 ):
     from ..search.service import faiss_service
 
@@ -254,7 +253,7 @@ async def edit_server_submit(
 async def edit_server_submit(
     server_id: str
 ):
-    """기존에 없는 api"""
+    """Delete MCP Server Data"""
     server_info = server_service.get_server_info(server_id)
     if not server_info:
         return JSONResponse(
@@ -412,9 +411,36 @@ async def delete_all_tools(
         }
     )
 
-@router.delete("/mcp/{server_id}/tools/{toolName}")
+@router.delete("/mcp/{server_id}/tools/{tool_name}")
 async def delete_all_tools(
     server_id: str,
-    toolName: str
+    tool_name: str
 ):
     """Delete a specific tool from an MCP"""
+    server_info = server_service.get_server_info(server_id)
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
+
+    success = server_service.delete_tools_by_id(server_id, tool_name)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to updated tools data"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "MCP tool deleted successfully"
+        }
+    )
