@@ -28,7 +28,7 @@ class MCPRegisterRequest(BaseModel):
     migrationStatus: Optional[str] = "none"
     serverUrl: str
     protocol: Optional[str] = "http"
-    security: Optional[Dict] = {}
+    security: Optional[str] = "none"
     supportedFormats: Optional[List[str]] = []
     tags: Optional[List[str]] = []
     environment: Optional[str] = "production"

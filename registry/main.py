@@ -161,7 +161,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(servers_router, prefix="/api", tags=["Server Management"])
 app.include_router(health_router, prefix="/api/health", tags=["Health Monitoring"])
-app.include_router(mcp_servers_router, prefix="", tags=["MCP Server Management"])
+app.include_router(mcp_servers_router, prefix="/api", tags=["MCP Server Management"])
 
 
 # Add user info endpoint for React auth context
