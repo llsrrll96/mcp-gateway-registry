@@ -4,10 +4,8 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-import httpx
-from urllib.parse import urlparse
+from fastapi.responses import RedirectResponse, JSONResponse
+
 import uuid
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -84,31 +82,31 @@ async def mcp_register_service(
     # 기존 저장
     from registry.api.server_routes import register_service
     # register_service 호출 (HTTP 호출이 아니라 내부 함수 호출)
-    response: JSONResponse = await register_service(
-        name=body.name,
-        description=body.description,
-        path=path,
-        proxy_pass_url=body.serverUrl,
-        tags=tag_str,
-        num_tools=0,
-        num_stars=0,
-        is_python=False,
-        license_str="N/A",
-        user_context= user_context
-    )
-    if response.status_code != 201:
-        try:
-            body_json = json.loads(response.body.decode())
-            message_content = body_json.get("error") if isinstance(body_json, dict) else str(body_json)
-        except Exception:
-            message_content = "failed to regist server"
-        return JSONResponse(
-            status_code=response.status_code,
-            content={
-                "success": False,
-                "message": message_content
-            }
-        )
+    # response: JSONResponse = await register_service(
+    #     name=body.name,
+    #     description=body.description,
+    #     path=path,
+    #     proxy_pass_url=body.serverUrl,
+    #     tags=tag_str,
+    #     num_tools=0,
+    #     num_stars=0,
+    #     is_python=False,
+    #     license_str="N/A",
+    #     user_context= user_context
+    # )
+    # if response.status_code != 201:
+    #     try:
+    #         body_json = json.loads(response.body.decode())
+    #         message_content = body_json.get("error") if isinstance(body_json, dict) else str(body_json)
+    #     except Exception:
+    #         message_content = "failed to regist server"
+    #     return JSONResponse(
+    #         status_code=response.status_code,
+    #         content={
+    #             "success": False,
+    #             "message": message_content
+    #         }
+    #     )
 
     server_id = clean_uuid
 
@@ -148,24 +146,19 @@ async def mcp_register_service(
     # Broadcast health status update to WebSocket clients
 
     # enable true 가  default 인 과정 - active
-    from registry.api.server_routes import toggle_service_route
-    response: JSONResponse = await toggle_service_route(
-        request=None,
-        service_path=path,
-        enabled="on",  # Form 데이터 대체
-        user_context=user_context,
-    )
-    if response.status_code == 200:
-        logger.info(f"enable 성공: {response.body.decode()}")
-        # tool_list 를 가져와서 , servers json 에 채우기
-        # MCP 서버에서 최신 tool 목록 가져오기
-
-        # 기존 서버 정보와 비교
-
-        # 변경된 경우 서버 정보 갱신
-
-    else:
-        logger.error(f"enable 실패: '{response.status_code}', off 로 설정", )
+    # from registry.api.server_routes import toggle_service_route
+    # response: JSONResponse = await toggle_service_route(
+    #     request=None,
+    #     service_path=path,
+    #     enabled="on",  # Form 데이터 대체
+    #     user_context=user_context,
+    # )
+    # if response.status_code == 200:
+    #     logger.info(f"enable 성공: {response.body.decode()}")
+    #     # tool_list 를 가져와서 , servers json 에 채우기
+    #
+    # else:
+    #     logger.error(f"enable 실패: '{response.status_code}', off 로 설정", )
 
     return JSONResponse(
         status_code=201,
@@ -384,3 +377,43 @@ async def update_server_tools(
             "message": "MCP tools saved successfully"
         }
     )
+
+
+@router.delete("/mcp/{server_id}/tools")
+async def delete_all_tools(
+    server_id: str
+):
+    """Delete all tool list for a service"""
+    server_info = server_service.get_server_info(server_id)
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
+
+    success = server_service.delete_all_tools(server_id)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to updated tools data"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "All MCP tools deleted successfully"
+        }
+    )
+
+@router.delete("/mcp/{server_id}/tools{")
+async def delete_all_tools(
+    server_id: str
+):
+    """Delete a specific tool from an MCP"""

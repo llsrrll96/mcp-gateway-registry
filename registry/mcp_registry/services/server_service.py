@@ -140,10 +140,85 @@ class ServerService:
         if not server_info:
             logger.warning(f"No registered server found with id '{server_id}'")
             return False
+        return self.update_tool_list_by_id(server_id, tool_list)
 
-        server_info["tool_list"] = tool_list or []
-        logger.info(f"Updated tool_list for {server_id}: {server_info['tool_list']}")
-        return True
+    def update_tool_list_by_id(self, server_id: str, tool_list: Optional[List[Dict]]) -> bool:
+        """Update tool_list for a given server with provided data, and save to file."""
+        try:
+            # 인메모리에 등록된 서버 정보 가져오기
+            server_info = self.registered_servers.get(server_id)
+            if not server_info:
+                logger.warning(f"No registered server found with id '{server_id}'")
+                return False
+
+            # tool_list 업데이트 (없으면 빈 리스트로)
+            server_info["tool_list"] = tool_list or []
+            logger.info(f"Updated tool_list for {server_id}: {server_info['tool_list']}")
+
+            # 서버 파일 경로 계산
+            path = server_info["path"]
+            filename = self._path_to_filename(path)
+            file_path = settings.servers_dir / filename
+
+            # 최신 데이터 파일에도 반영
+            with open(file_path, "w") as f:
+                json.dump(server_info, f, indent=2)
+
+            logger.info(f"Successfully saved updated tool_list for server_id '{server_id}' at {file_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update tool_list for id '{server_id}': {e}", exc_info=True)
+            return False
+
+
+    def delete_all_tools(self, server_id: str):
+        # json 파일
+        return self.delete_tool_list_by_id(server_id)
+
+    def delete_tool_list_by_id(self, server_id: str) -> bool:
+        """Clear the tool_list inside server file using server_id."""
+        try:
+            # 인메모리에 등록된 서버 정보 가져오기
+            server_info = self.registered_servers.get(server_id)
+            if not server_info:
+                logger.warning(f"No registered server found with id '{server_id}'")
+                return False
+
+            # path → 파일명으로 변환
+            path = server_info["path"]
+            filename = self._path_to_filename(path)
+            file_path = settings.servers_dir / filename
+
+            if file_path.exists():
+                # 파일 읽기 (JSON)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                # tool_list 비우기
+                if "tool_list" in data:
+                    data["tool_list"] = []
+
+                    # 변경 내용 저장
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+
+                    # 인메모리 데이터도 업데이트
+                    server_info["tool_list"] = []
+                    self.registered_servers[server_id] = server_info
+
+                    logger.info(f"Cleared tool_list for server id '{server_id}' in {file_path}")
+                    return True
+                else:
+                    logger.warning(f"No tool_list found in server file for id '{server_id}'")
+                    return False
+            else:
+                logger.warning(f"Server file not found for id '{server_id}' at {file_path}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to clear tool_list for id '{server_id}': {e}", exc_info=True)
+            return False
 
 # Global service instance
 server_service = ServerService()
