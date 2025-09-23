@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from registry.auth.routes import router as auth_router
 from registry.api.server_routes import router as servers_router
 from registry.health.routes import router as health_router
+from registry.mcp_registry.api.server_routes import router as mcp_servers_router
 
 # Import auth dependencies
 from registry.auth.dependencies import enhanced_auth
@@ -30,6 +31,7 @@ from registry.services.server_service import server_service
 from registry.search.service import faiss_service
 from registry.health.service import health_service
 from registry.core.nginx_service import nginx_service
+from registry.mcp_registry.services.server_service import server_service as mcp_server_service
 
 # Import core configuration
 from registry.core.config import settings
@@ -92,7 +94,8 @@ async def lifespan(app: FastAPI):
         # Initialize services in order
         logger.info("📚 Loading server definitions and state...")
         server_service.load_servers_and_state()
-        
+        mcp_server_service.load_servers_and_state()
+
         logger.info("🔍 Initializing FAISS search service...")
         await faiss_service.initialize()
         
@@ -158,6 +161,8 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(servers_router, prefix="/api", tags=["Server Management"])
 app.include_router(health_router, prefix="/api/health", tags=["Health Monitoring"])
+app.include_router(mcp_servers_router, prefix="", tags=["MCP Server Management"])
+
 
 # Add user info endpoint for React auth context
 @app.get("/api/auth/me")

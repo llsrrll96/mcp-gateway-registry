@@ -16,6 +16,113 @@ class ServerService:
         self.registered_servers: Dict[str, Dict[str, Any]] = {}
         self.service_state: Dict[str, bool] = {}  # enabled/disabled state
 
+    def load_servers_and_state(self):
+        """Load server definitions and persisted state from disk."""
+        logger.info(f"2Loading server definitions from {settings.servers_dir}...")
+
+        # Create servers directory if it doesn't exist
+        settings.servers_dir.mkdir(parents=True, exist_ok=True)
+
+        temp_servers = {}
+        server_files = list(settings.servers_dir.glob("**/*.json"))
+        logger.info(f"2Found {len(server_files)} JSON files in {settings.servers_dir} and its subdirectories")
+
+        if not server_files:
+            logger.warning(f"2No server definition files found in {settings.servers_dir}. Initializing empty registry.")
+            self.registered_servers = {}
+
+        for server_file in server_files:
+            if server_file.name == settings.state_file_path.name:
+                continue  # 상태 파일은 건너뜀
+
+            try:
+                with open(server_file, "r") as f:
+                    server_info = json.load(f)
+
+                    if (
+                            isinstance(server_info, dict)
+                            and "id" in server_info
+                            and "name" in server_info
+                    ):
+                        server_id = server_info["id"]
+                        if server_id in temp_servers:
+                            logger.warning(f"2Duplicate server path found in {server_file}: {server_id}. Overwriting previous definition.")
+
+                        server_info["id"] = server_info.get("id", "")
+                        server_info["name"] = server_info.get("name", "")
+                        server_info["version"] = server_info.get("version", "1.0")
+                        server_info["description"] = server_info.get("description", "")
+                        server_info["status"] = server_info.get("status", "active")
+                        server_info["type"] = server_info.get("type", "")
+                        server_info["scope"] = server_info.get("scope", "external")
+                        server_info["migrationStatus"] = server_info.get("migrationStatus", "none")
+                        server_info["serverUrl"] = server_info.get("serverUrl", "")
+                        server_info["protocol"] = server_info.get("protocol", "http")
+                        server_info["security"] = server_info.get("security", {})
+                        server_info["supportedFormats"] = server_info.get("supportedFormats", [])
+                        server_info["tags"] = server_info.get("tags", [])
+                        server_info["environment"] = server_info.get("environment", "production")
+                        server_info["tool_list"] = server_info.get("tool_list", [])
+                        server_info["path"] = server_info.get("path", "")
+
+                        temp_servers[server_id] = server_info
+                    else:
+                        logger.warning(f"2Invalid server entry format found in {server_file}. Skipping.")
+            except FileNotFoundError:
+                logger.error(f"2Server definition file {server_file} reported by glob not found.")
+            except json.JSONDecodeError as e:
+                logger.error(f"2Could not parse JSON from {server_file}: {e}.")
+            except Exception as e:
+                logger.error(f"2An unexpected error occurred loading {server_file}: {e}", exc_info=True)
+
+        self.registered_servers = temp_servers
+        logger.info(f"Successfully2loaded {len(self.registered_servers)} server definitions.")
+
+        # Load persisted service state
+        self._load_service_state()
+
+    def _load_service_state(self):
+        """Load persisted service state from disk."""
+        logger.info(f"Attempting to load persisted state from {settings.state_file_path}...")
+        loaded_state = {}
+
+        try:
+            if settings.state_file_path.exists():
+                with open(settings.state_file_path, "r") as f:
+                    loaded_state = json.load(f)
+                if not isinstance(loaded_state, dict):
+                    logger.warning(
+                        f"Invalid state format in {settings.state_file_path}. Expected a dictionary. Resetting state.")
+                    loaded_state = {}
+                else:
+                    logger.info("Successfully loaded persisted state.")
+            else:
+                logger.info(f"No persisted state file found at {settings.state_file_path}. Initializing state.")
+        except json.JSONDecodeError as e:
+            logger.error(f"Could not parse JSON from {settings.state_file_path}: {e}. Initializing empty state.")
+            loaded_state = {}
+        except Exception as e:
+            logger.error(f"Failed to read state file {settings.state_file_path}: {e}. Initializing empty state.",
+                         exc_info=True)
+            loaded_state = {}
+
+        # Initialize service state
+        self.service_state = {}
+        for path in self.registered_servers.keys():
+            # Try exact match first, then try with/without trailing slash
+            value = loaded_state.get(path, None)
+            if value is None:
+                if path.endswith('/'):
+                    # Try without trailing slash
+                    value = loaded_state.get(path.rstrip('/'), False)
+                else:
+                    # Try with trailing slash
+                    value = loaded_state.get(path + '/', False)
+            self.service_state[path] = value
+
+        logger.info(f"Initial service state loaded: {self.service_state}")
+
+
     def get_all_servers(self) -> Dict[str, Dict[str, Any]]:
         """Get all registered servers."""
         return self.registered_servers.copy()

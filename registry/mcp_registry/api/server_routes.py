@@ -41,7 +41,7 @@ class MCPToolsUpdateRequest(BaseModel):
 async def get_servers_json():
 
     all_servers = server_service.get_all_servers()
-    logger.info(f"get_servers_json: {all_servers}") # {'/a0d063b92a384691bc4bce3986e5f8af': == key가 path로 반환됨
+    # {'a0d063b92a384691bc4bce3986e5f8af': == key가 id
 
     # path와 서버 정보를 합쳐서 리스트로 만들기
     service_data = []
@@ -412,8 +412,9 @@ async def delete_all_tools(
         }
     )
 
-@router.delete("/mcp/{server_id}/tools{")
+@router.delete("/mcp/{server_id}/tools/{toolName}")
 async def delete_all_tools(
-    server_id: str
+    server_id: str,
+    toolName: str
 ):
     """Delete a specific tool from an MCP"""
