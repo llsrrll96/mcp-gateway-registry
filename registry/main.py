@@ -22,6 +22,8 @@ from registry.auth.routes import router as auth_router
 from registry.api.server_routes import router as servers_router
 from registry.health.routes import router as health_router
 from registry.mcp_registry.api.server_routes import router as mcp_servers_router
+from registry.agent_registry.api.server_routes import router as agent_servers_router
+
 
 # Import auth dependencies
 from registry.auth.dependencies import enhanced_auth
@@ -162,6 +164,7 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(servers_router, prefix="/api", tags=["Server Management"])
 app.include_router(health_router, prefix="/api/health", tags=["Health Monitoring"])
 app.include_router(mcp_servers_router, prefix="/api", tags=["MCP Server Management"])
+app.include_router(agent_servers_router, prefix="/api", tags=["Agent Server Management"])
 
 
 # Add user info endpoint for React auth context
