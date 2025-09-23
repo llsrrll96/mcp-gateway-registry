@@ -12,6 +12,13 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
 
     container_registry_dir: Path = Path("/app/registry/agent_registry")
+
+    # Local development mode detection
+    @property
+    def is_local_dev(self) -> bool:
+        """Check if running in local development mode."""
+        return not Path("/app").exists()
+
     @property
     def agents_dir(self) -> Path:
         if self.is_local_dev:
