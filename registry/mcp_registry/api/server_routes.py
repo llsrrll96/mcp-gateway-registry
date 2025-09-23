@@ -34,7 +34,10 @@ class MCPRegisterRequest(BaseModel):
     supportedFormats: Optional[List[str]] = []
     tags: Optional[List[str]] = []
     environment: Optional[str] = "production"
+    tool_list: Optional[List[dict]] = []
 
+class MCPToolsUpdateRequest(BaseModel):
+    tools: Optional[List[dict]] = []
 
 @router.get("/mcp", name="servers")
 async def get_servers_json():
@@ -125,7 +128,7 @@ async def mcp_register_service(
         "supportedFormats": body.supportedFormats,
         "tags": body.tags,
         "environment": body.environment,
-        "tool_list": [],
+        "tool_list": body.tool_list,
         "path": path,
     }
 
@@ -203,7 +206,14 @@ async def edit_server_submit(
     body: MCPRegisterRequest
 ):
     server_info = server_service.get_server_info(server_id)
-    logger.info(f"edit_server_submit: {server_info}")
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service path not found"
+            }
+        )
 
     # Prepare updated server data
     updated_server_entry = {
@@ -221,6 +231,7 @@ async def edit_server_submit(
         "supportedFormats": body.supportedFormats,
         "tags": body.tags,
         "environment": body.environment,
+        "tool_list": body.tool_list,
         "path": server_info["path"]
     }
 
@@ -242,7 +253,7 @@ async def edit_server_submit(
         status_code=status.HTTP_200_OK,
         content={
             "success": True,
-            "data": server_info
+            "data": updated_server_entry
         }
     )
 
@@ -285,16 +296,22 @@ async def edit_server_submit(
 
 # /api/tools/{service_path}
 @router.get("/mcp/{server_id}/tools")
-async def get_server_details(
+async def get_server_tools(
     server_id: str,
 ):
     """Get tool list for a service"""
+    # from ..core.mcp_client import mcp_client_service
+
     # Handle specific server case - fetch live tools from MCP server
     server_info = server_service.get_server_info(server_id)
     if not server_info:
-        raise HTTPException(status_code=404,
-                            detail="Service path not registered")
-
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
     # Check if service is enabled and healthy
     # is_enabled = server_service.is_service_enabled(server_id)
     # if not is_enabled:
@@ -302,7 +319,68 @@ async def get_server_details(
 
     server_url = server_info.get("serverUrl")
     if not server_url:
-        raise HTTPException(status_code=500, detail="Service has no server_url configured")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Service has no server_url configured"
+            }
+        )
 
     logger.info(f"Fetching live tools for {server_id} from {server_url}")
-    # try: ..
+    # try:
+        # Call MCP client to fetch fresh tools using server configuration
+        # MCP 서버에서 최신 툴 목록을 가져와서 레지스트리 갱신
+        # tool_list = await mcp_client_service.get_tools_from_server_with_server_info(server_url, server_info)
+        # if tool_list is None:
+        #     return JSONResponse(
+        #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #         content={
+        #             "success": False,
+        #             "message": "Failed to fetch tools from MCP server. Service may be unhealthy."
+        #         }
+        #     )
+    tool_list = server_info.get("tool_list")
+
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": tool_list
+        }
+    )
+
+@router.post("/mcp/{server_id}/tools")
+async def update_server_tools(
+    server_id: str,
+    body: MCPToolsUpdateRequest
+):
+    """Update tool list for a service"""
+    server_info = server_service.get_server_info(server_id)
+    if not server_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
+
+    success = server_service.update_tool_list(server_id, body.tools)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to updated tools data"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "MCP tools saved successfully"
+        }
+    )

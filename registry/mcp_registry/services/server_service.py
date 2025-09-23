@@ -134,5 +134,16 @@ class ServerService:
             logger.error(f"Failed to delete server file for id '{server_id}': {e}", exc_info=True)
             return False
 
+    def update_tool_list(self, server_id: str, tool_list: Optional[List[Dict]]):
+        """Update the tool_list for a given server."""
+        server_info = self.registered_servers.get(server_id)
+        if not server_info:
+            logger.warning(f"No registered server found with id '{server_id}'")
+            return False
+
+        server_info["tool_list"] = tool_list or []
+        logger.info(f"Updated tool_list for {server_id}: {server_info['tool_list']}")
+        return True
+
 # Global service instance
 server_service = ServerService()
