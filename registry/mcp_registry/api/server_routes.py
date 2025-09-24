@@ -399,7 +399,7 @@ async def delete_all_tools(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "success": False,
-                "message": "Failed to updated tools data"
+                "message": "Failed to deleted tools data"
             }
         )
 

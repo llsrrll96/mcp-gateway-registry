@@ -166,4 +166,30 @@ async def delete_a2a_agent(
 ):
     """Delete an A2A agent"""
     logger.info(f"delete_a2a_agent")
+    agent_info = server_service.get_agent_info(agent_id)
+    if not agent_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
 
+    success = server_service.delete_agent(agent_id)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to deleted agent"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "Agent deleted successfully"
+        }
+    )

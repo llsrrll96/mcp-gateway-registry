@@ -1,4 +1,4 @@
-
+from pathlib import Path
 import json
 import logging
 from typing import Dict, List, Any, Optional
@@ -147,8 +147,7 @@ class ServerService:
 
             # Generate filename based on path
             agent_id = agent_info["id"]
-            filename = self._agent_id_to_filename(agent_id)
-            file_path = settings.agents_dir / filename
+            file_path = self._get_agent_file_path(agent_id)
 
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(agent_info, f, indent=2, ensure_ascii=False)
@@ -210,7 +209,7 @@ class ServerService:
                 return False
 
             # id → 파일명으로 변환
-            file_path = _get_agent_file_path(agent_info)
+            file_path = self._get_agent_file_path(agent_id)
 
             if file_path.exists():
                 file_path.unlink()  # 파일 삭제
@@ -221,16 +220,13 @@ class ServerService:
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to delete agent file for id '{agent_id}': {e}", exc_info=True)
+            logger.error(f"Failed to delete agent file for id '{agent_id}'at {file_path}: {e}", exc_info=True)
             return False
 
-def _get_agent_file_path(self, agent_info: dict) -> Any:
-    """
-    Generate full file path for an agent based on its ID.
-    """
-    agent_id = agent_info["id"]
-    filename = self._agent_id_to_filename(agent_id)
-    return self.settings.agents_dir / filename
+    def _get_agent_file_path(self, agent_id: str) -> Path:
+        """Get the file path for an agent ID."""
+        filename = self._agent_id_to_filename(agent_id)
+        return settings.agents_dir / filename
 
 # Global service instance
 server_service = ServerService()
