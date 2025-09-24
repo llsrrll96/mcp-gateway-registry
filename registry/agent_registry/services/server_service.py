@@ -45,7 +45,7 @@ class ServerService:
             # Generate filename based on path
             agent_id = agent_info["id"]
             filename = self._agent_id_to_filename(agent_id)
-            file_path = settings.servers_dir / filename
+            file_path = settings.agents_dir / filename
 
             with open(file_path, "w") as f:
                 json.dump(agent_info, f, indent=2)
