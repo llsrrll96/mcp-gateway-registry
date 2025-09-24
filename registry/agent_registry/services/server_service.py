@@ -11,7 +11,7 @@ class ServerService:
 
     def __init__(self):
         self.registered_agents: Dict[str, Dict[str, Any]] = {}
-        self.registered_agents_auth: Dict[str, Dict[str, Any]] = {}
+        # self.registered_agents_auth: Dict[str, Dict[str, Any]] = {}
         self.agent_state: Dict[str, bool] = {}  # enabled/disabled state
 
 
@@ -195,6 +195,7 @@ class ServerService:
 
         # Delete to file
         self.delete_agent_file_by_id(agent_id)
+        self.delete_agent_auth_file_by_id(agent_id)
 
         self.registered_agents.pop(agent_id, None)
         self.agent_state.pop(agent_id, None)
@@ -238,7 +239,7 @@ class ServerService:
         if not self.save_agent_auth_to_file(agent_auth_info):
             return False
 
-        self.registered_agents_auth[agent_id] = agent_auth_info
+        # self.registered_agents_auth[agent_id] = agent_auth_info
         return True
 
     def save_agent_auth_to_file(self, agent_auth_info: Dict[str, Any]) -> bool:
@@ -265,8 +266,73 @@ class ServerService:
         filename = self._agent_id_to_filename(agent_id)
         return settings.agents_auth_dir / filename
 
-    def get_agent_auth_info(self, agent_id: str) -> Optional[Dict[str, Any]]:
-        return self.registered_agents_auth.get(agent_id)
+
+    def get_agent_auth_info_file(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            # 인증 정보 디렉토리 생성 (없으면)
+            settings.agents_auth_dir.mkdir(parents=True, exist_ok=True)
+
+            # 파일 경로 생성
+            file_path = self._get_agent_auth_file_path(agent_id)
+
+            if not file_path.exists():
+                logger.warning(f"Agent auth file not found: {file_path}")
+                return None
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                agent_auth_info = json.load(f)
+
+            logger.info(f"Successfully loaded agent auth {agent_id}, {file_path}")
+            return agent_auth_info
+
+        except Exception as e:
+            logger.error(
+                f"Failed to load agent auth data for {agent_id}, {file_path}: {e}",
+                exc_info=True
+            )
+            return None
+
+
+    def delete_agent_auth(self, agent_id: str):
+        
+        # 인메모리에 등록된 서버 정보 가져오기
+        # agent_info = self.registered_agents_auth.get(agent_id)
+        agent_info = self.get_agent_auth_info_file(agent_id)
+        if not agent_info:
+            logger.warning(f"No registered agent found with id '{agent_id}'")
+            return False
+
+        # Delete to file
+        self.delete_agent_auth_file_by_id(agent_id)
+
+        # self.registered_agents_auth.pop(agent_id, None)
+        return True
+                
+    def delete_agent_auth_file_by_id(self, agent_id: str) -> bool:
+        try:
+            # 인메모리에 등록된 서버 정보 가져오기
+            # agent_info = self.registered_agents_auth.get(agent_id)
+            agent_info = self.get_agent_auth_info_file(agent_id)
+
+            if not agent_info:
+                logger.warning(f"No registered server found with id '{agent_id}'")
+                return False
+
+            # path → 파일명으로 변환
+            file_path = self._get_agent_auth_file_path(agent_id)
+
+            if file_path.exists():
+                file_path.unlink()  # 파일 삭제
+                logger.info(f"Successfully deleted server file for id '{agent_id}' at {file_path}")
+                return True
+            else:
+                logger.warning(f"Server file not found for id '{agent_id}' at {file_path}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to delete server file for id '{agent_id}': {e}", exc_info=True)
+            return False
+
 
 
 # Global service instance

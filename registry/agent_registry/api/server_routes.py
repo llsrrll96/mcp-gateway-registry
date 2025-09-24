@@ -228,6 +228,7 @@ async def update_a2a_agent(
 
     updated_agent_auth = {
         "id": agent_id,
+        "authType": body.authType,
         "apiKeyLocation": body.apiKeyLocation,
         "apiKeyName": body.apiKeyName,
         "apiKeyValue": body.apiKeyValue,
@@ -265,14 +266,14 @@ async def get_a2a_agent_auth(
     agent_id: str
 ):
     """Get A2A agent auth"""
-    agent_auth_info = server_service.get_agent_auth_info(agent_id)
+    agent_auth_info = server_service.get_agent_auth_info_file(agent_id)
     logger.info(f"get_server_details: {agent_auth_info}")
     if not agent_auth_info:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={
                 "success": False,
-                "message": "Agent id not registered"
+                "message": "Agent auth not registered"
             }
         )
 
@@ -288,3 +289,31 @@ async def delete_a2a_agent_auth(
     agent_id: str
 ):
     """delete_a2a_agent_auth"""
+    agent_auth_info = server_service.get_agent_auth_info_file(agent_id)
+    logger.info(f"get_server_details: {agent_auth_info}")
+    if not agent_auth_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Agent auth id not registered"
+            }
+        )
+
+    success = server_service.delete_agent_auth(agent_id)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to deleted Agent auth"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": "Agent auth deleted successfully"
+        }
+    )
