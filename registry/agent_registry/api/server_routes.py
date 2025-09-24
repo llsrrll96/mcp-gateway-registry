@@ -24,6 +24,20 @@ class AgentMetaDataRequest(BaseModel):
     status: Optional[str] = ""
     boundMcps: Optional[List[dict]] = []
 
+class AgentAuthRequest(BaseModel):
+    authType: str
+    apiKeyLocation: Optional[str] = None
+    apiKeyName: Optional[str] = None
+    apiKeyValue: Optional[str] = None
+    bearerToken: Optional[str] = None
+    basicUsername: Optional[str] = None
+    basicPassword: Optional[str] = None
+    oauthClientId: Optional[str] = None
+    oauthClientSecret: Optional[str] = None
+    oauthTokenUrl: Optional[str] = None
+    oauthScope: Optional[str] = None
+
+
 
 @router.get("/a2a", name="List A2A Agents")
 async def get_all_a2a_agents():
@@ -193,3 +207,84 @@ async def delete_a2a_agent(
             "message": "Agent deleted successfully"
         }
     )
+
+
+# auth
+@router.post("/a2a/{agent_id}/auth", name="Update A2A Agent")
+async def update_a2a_agent(
+    agent_id: str,
+    body: AgentAuthRequest
+):
+    """Update an auth of A2A agent"""
+    agent_info = server_service.get_agent_info(agent_id)
+    if not agent_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Service id not registered"
+            }
+        )
+
+    updated_agent_auth = {
+        "id": agent_id,
+        "apiKeyLocation": body.apiKeyLocation,
+        "apiKeyName": body.apiKeyName,
+        "apiKeyValue": body.apiKeyValue,
+        "bearerToken": body.bearerToken,
+        "basicUsername": body.basicUsername,
+        "basicPassword": body.basicPassword,
+        "oauthClientId": body.oauthClientId,
+        "oauthClientSecret": body.oauthClientSecret,
+        "oauthTokenUrl": body.oauthTokenUrl,
+        "oauthScope": body.oauthScope
+    }
+    success = server_service.update_auth(agent_id, updated_agent_auth)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to save updated agent auth"
+            }
+        )
+
+    logger.info(f"agent {agent_id} auth updated'")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": updated_agent_auth,
+            "message": "A2A agent auth updated successfully"
+        }
+    )
+
+@router.get("/a2a/{agent_id}/auth", name="Retrieve A2A Agent auth")
+async def get_a2a_agent_auth(
+    agent_id: str
+):
+    """Get A2A agent auth"""
+    agent_auth_info = server_service.get_agent_auth_info(agent_id)
+    logger.info(f"get_server_details: {agent_auth_info}")
+    if not agent_auth_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Agent id not registered"
+            }
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": agent_auth_info
+        }
+    )
+@router.delete("/a2a/{agent_id}/auth", name="Delete A2A Agent auth")
+async def delete_a2a_agent_auth(
+    agent_id: str
+):
+    """delete_a2a_agent_auth"""

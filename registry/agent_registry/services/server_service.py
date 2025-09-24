@@ -11,6 +11,7 @@ class ServerService:
 
     def __init__(self):
         self.registered_agents: Dict[str, Dict[str, Any]] = {}
+        self.registered_agents_auth: Dict[str, Dict[str, Any]] = {}
         self.agent_state: Dict[str, bool] = {}  # enabled/disabled state
 
 
@@ -227,6 +228,46 @@ class ServerService:
         """Get the file path for an agent ID."""
         filename = self._agent_id_to_filename(agent_id)
         return settings.agents_dir / filename
+
+    def update_auth(self, agent_id: str, agent_auth_info: Dict[str, Any]) -> bool:
+        if agent_id not in self.registered_agents:
+            logger.error(f"Cannot update agent at id '{agent_id}': not found")
+            return False
+
+        # Save to file
+        if not self.save_agent_auth_to_file(agent_auth_info):
+            return False
+
+        self.registered_agents_auth[agent_id] = agent_auth_info
+        return True
+
+    def save_agent_auth_to_file(self, agent_auth_info: Dict[str, Any]) -> bool:
+        try:
+            # Create agents auth directory if it doesn't exist
+            settings.agents_auth_dir.mkdir(parents=True, exist_ok=True)
+
+            # Generate filename based on path
+            agent_id = agent_auth_info["id"]
+            file_path = self._get_agent_auth_file_path(agent_id)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(agent_auth_info, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"Successfully saved agent auth {agent_id}, {file_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save agent auth data to {agent_id}, {file_path}: {e}",
+                         exc_info=True)
+            return False
+
+    def _get_agent_auth_file_path(self, agent_id: str) -> Path:
+        """Get the file path for an agent ID."""
+        filename = self._agent_id_to_filename(agent_id)
+        return settings.agents_auth_dir / filename
+
+    def get_agent_auth_info(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        return self.registered_agents_auth.get(agent_id)
+
 
 # Global service instance
 server_service = ServerService()

@@ -25,6 +25,11 @@ class Settings(BaseSettings):
             return Path.cwd() / "registry" / "agent_registry" / "servers" # 기존: Path.cwd() / "registry" / "servers"
         return self.container_registry_dir / "servers"
 
+    @property
+    def agents_auth_dir(self) -> Path:
+        if self.is_local_dev:
+            return Path.cwd() / "registry" / "agent_registry" / "servers" / "auth" # 기존: Path.cwd() / "registry" / "servers"
+        return self.container_registry_dir / "servers" / "auth"
 
     @property
     def state_file_path(self) -> Path:
