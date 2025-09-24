@@ -79,7 +79,8 @@ async def create_a2a_agent(
         status_code=status.HTTP_201_CREATED,
         content={
             "success": True,
-            "data": agent_entry
+            "data": agent_entry,
+            "message": "A2A agent created successfully"
         },
     )
 
@@ -110,10 +111,55 @@ async def get_all_a2a_agents(
     )
 
 @router.put("/a2a/{agent_id}", name="Update A2A Agent")
-async def update_a2a_agent():
+async def update_a2a_agent(
+    agent_id: str,
+    body: AgentMetaDataRequest
+):
     """Update an existing A2A agent"""
     logger.info(f"update_a2a_agent")
+    agent_info = server_service.get_agent_info(agent_id)
+    logger.info(f"get_server_details: {agent_info}")
+    if not agent_info:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "success": False,
+                "message": "Agent id not registered"
+            }
+        )
 
+    updated_agent_entry = {
+        "id": agent_id,
+        "agentCardUrl": body.agentCardUrl,
+        "agentCard": body.agentCard,
+        "type": body.type,
+        "version": body.version,
+        "description": body.description,
+        "tags": body.tags,
+        "environment": body.environment,
+        "status": body.status,
+        "boundMcps": body.boundMcps
+    }
+    success = server_service.update_agent(agent_id, updated_agent_entry)
+    if not success:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": "Failed to save updated agent data"
+            }
+        )
+
+    logger.info(f"agent '{body.agentCardUrl}' ({agent_info["id"]}) updated '")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": updated_agent_entry,
+            "message": "A2A agent updated successfully"
+        }
+    )
 @router.delete("/a2a/{agent_id}", name="Delete A2A Agent")
 async def delete_a2a_agent(
     agent_id: str

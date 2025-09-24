@@ -34,6 +34,8 @@ from registry.search.service import faiss_service
 from registry.health.service import health_service
 from registry.core.nginx_service import nginx_service
 from registry.mcp_registry.services.server_service import server_service as mcp_server_service
+from registry.agent_registry.services.server_service import server_service as agent_server_service
+
 
 # Import core configuration
 from registry.core.config import settings
@@ -97,6 +99,7 @@ async def lifespan(app: FastAPI):
         logger.info("📚 Loading server definitions and state...")
         server_service.load_servers_and_state()
         mcp_server_service.load_servers_and_state()
+        agent_server_service.load_agents_and_state()
 
         logger.info("🔍 Initializing FAISS search service...")
         await faiss_service.initialize()

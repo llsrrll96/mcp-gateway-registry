@@ -26,6 +26,9 @@ class Settings(BaseSettings):
         return self.container_registry_dir / "servers"
 
 
+    @property
+    def state_file_path(self) -> Path:
+        return self.agents_dir / "server_state.json"
 
 
 
