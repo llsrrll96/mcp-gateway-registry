@@ -37,7 +37,11 @@ class AgentAuthRequest(BaseModel):
     oauthTokenUrl: Optional[str] = None
     oauthScope: Optional[str] = None
 
+class AgentFetchCardRequest(BaseModel):
+    agent_url: str
 
+class AgentAgentCardRequest(BaseModel):
+    agentCard: Optional[List[dict]]
 
 @router.get("/a2a", name="List A2A Agents")
 async def get_all_a2a_agents():
@@ -317,3 +321,86 @@ async def delete_a2a_agent_auth(
             "message": "Agent auth deleted successfully"
         }
     )
+
+@router.post("/a2a/fetch-card", name="Fetch Agent Card")
+async def update_a2a_agent(
+    request: AgentFetchCardRequest
+):
+    """Fetch an agent card from a URL"""
+    # 1. Agent Card 가져오기
+    agent_url = request.agent_url
+    logger.info(f"Fetching Agent Card from: {agent_url}")
+    result = await server_service.fetch_json(agent_url)
+    if not result["success"]:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": result["success"],
+                "message": result["message"]
+            }
+        )
+    logger.info(f"Agent Card fetched successfully: {result}")
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "data": result["data"],
+            "message": "Agent card fetched successfully"
+        }
+    )
+
+@router.post("/a2a/validate", name="Validate Agent Card")
+async def update_a2a_agent(
+        request: AgentAgentCardRequest
+):
+    """Validate an A2A agent card"""
+
+
+
+
+
+    # 2. Health Check
+    # logger.info("Performing health check...")
+    # health_ok = await check_agent_health(agent_url)
+    # if not health_ok:
+    #     logger.warning("Health check failed, but continuing registration...")
+
+    # 3. Registry에 저장
+    # logger.info("Saving to registry...")
+    # registration_data = await server_service.save_to_registry(agent_card_data)
+
+
+
+# health 패키지로 이동 예정
+# async def check_agent_health(agent_url: str) -> bool:
+#     """Agent의 건강 상태 확인"""
+#     health_endpoints = [
+#         f"{agent_url}/health",
+#         f"{agent_url}/api/health",
+#         f"{agent_url}/api/v1/health",
+#         f"{agent_url}/status"
+#     ]
+#
+#     for endpoint in health_endpoints:
+#         try:
+#             async with httpx.AsyncClient(timeout=5.0) as client:
+#                 response = await client.get(endpoint)
+#                 if response.status_code == 200:
+#                     logger.info(f"Agent health check passed: {endpoint}")
+#                     return True
+#
+#         except (httpx.RequestError, httpx.HTTPStatusError):
+#             continue
+#
+#     # Health endpoint가 없어도 기본 URL에 접근 가능하면 OK
+#     try:
+#         async with httpx.AsyncClient(timeout=5.0) as client:
+#             response = await client.get(agent_url)
+#             if response.status_code < 500:  # 500 이상이 아니면 기본적으로 동작한다고 판단
+#                 logger.info(f"Agent basic connectivity check passed: {agent_url}")
+#                 return True
+#     except:
+#         pass
+#
+#     logger.warning(f"Agent health check failed for: {agent_url}")
+#     return False

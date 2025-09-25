@@ -1,3 +1,4 @@
+import httpx
 from pathlib import Path
 import json
 import logging
@@ -332,6 +333,67 @@ class ServerService:
         except Exception as e:
             logger.error(f"Failed to delete server file for id '{agent_id}': {e}", exc_info=True)
             return False
+
+
+    async def fetch_json(self, url: str, timeout: int = 10) -> Dict[str, Any]:
+        message = ""
+        try:
+            async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(timeout),
+                    follow_redirects=True,
+                    verify=False
+            ) as client:
+                response = await client.get(url)
+
+                response.raise_for_status()
+
+                content_type = response.headers.get('content-type', '')
+                if 'application/json' not in content_type:
+                    logger.warning(f"Content-Type is not JSON: {content_type}")
+                try:
+                    data = response.json()
+                except Exception as e:
+                    message = f"Invalid JSON response from {url}: {str(e)}"
+                    logger.error(message)
+                    return {"success": False, "message": message}
+
+                return {"success": True, "data": data}
+
+        except httpx.TimeoutException:
+            message = f"Timeout while fetching {url}"
+
+        except httpx.HTTPStatusError as e:
+            message = f"HTTP {e.response.status_code} error for {url}"
+
+        except httpx.RequestError as e:
+            message = f"Request error for {url}: {str(e)}"
+            logger.error(message)
+        except Exception as e:
+            message = f"Unexpected error while fetching {url}: {type(e).__name__}: {str(e)}"
+        return {"success": False, "message": message}
+
+# async def save_to_registry(agent_card: Dict[str, Any]) -> Dict[str, Any]:
+#     """Agent Card를 Registry에 저장"""
+#
+#     # 실제 구현에서는 데이터베이스에 저장
+#     registration_data = {
+#         "agent_id": f"{agent_card.name.lower().replace(' ', '-')}-{agent_card.version}",
+#         "agent_card": agent_card.dict(),
+#         "registered_at": datetime.utcnow().isoformat(),
+#         "status": "active",
+#         "last_health_check": datetime.utcnow().isoformat(),
+#         "health_status": "healthy"
+#     }
+#
+#     # Mock 저장 (실제로는 DB INSERT)
+#     logger.info(f"Agent registered successfully: {registration_data['agent_id']}")
+#
+#     # 여기서 데이터베이스 저장 로직 구현
+#     # await db.agents.insert(registration_data)
+#
+#     return registration_data
+
+
 
 
 
