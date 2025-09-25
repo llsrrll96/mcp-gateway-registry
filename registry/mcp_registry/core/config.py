@@ -13,7 +13,10 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"  # Ignore extra environment variables
     )
-    
+
+    CI_BUILD_URL: str = "http://10.10.20.158:5001/build"
+    CD_BUILD_URL: str = "http://10.10.20.158:5001/deploy"
+
     # Auth settings
     secret_key: str = ""
     admin_user: str = "admin"

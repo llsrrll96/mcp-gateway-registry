@@ -1,4 +1,4 @@
-import json
+import httpx
 import asyncio
 import logging
 from typing import Annotated
@@ -13,6 +13,8 @@ from typing import List, Dict, Optional
 # from ..core.config import settings
 from ...auth.dependencies import web_auth, api_auth, enhanced_auth
 from ..services.server_service import server_service
+from ..core.config import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,14 @@ class MCPRegisterRequest(BaseModel):
 
 class MCPToolsUpdateRequest(BaseModel):
     tools: Optional[List[dict]] = []
+
+class MCPCICDRequest(BaseModel):
+    id: Optional[str] = ""
+    project_full_path: str
+    project_full_name: str
+    status: Optional[str] = ""
+    version: Optional[str] = ""
+    port: Optional[str] = ""
 
 @router.get("/mcp", name="servers")
 async def get_servers_json():
@@ -444,3 +454,98 @@ async def delete_all_tools(
             "message": "MCP tool deleted successfully"
         }
     )
+
+@router.post("/mcp/build", name="MCP CI")
+async def mcp_build(
+        request: MCPCICDRequest
+):
+    str_uuid = str(uuid.uuid4())
+
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "id": str_uuid,
+        "project_full_path": request.project_full_path,
+        "project_full_name": request.project_full_name
+    }
+
+    # 비동기 호출
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(settings.CI_BUILD_URL, json=payload, headers=headers)
+            response.raise_for_status()
+            return {"status": "success", "data": response.json()}
+        except httpx.HTTPStatusError as e:
+            return {"status": "error", "detail": f"HTTP error: {e.response.status_code}"}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+@router.post("/mcp/deploy", name="MCP CD")
+async def mcp_deploy(
+        request: MCPCICDRequest
+):
+    str_uuid = str(uuid.uuid4())
+
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "id": str_uuid,
+        "project_full_path": request.project_full_path,
+        "project_full_name": request.project_full_name,
+        "version": request.version
+    }
+
+    # 비동기 호출
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(settings.CD_BUILD_URL, json=payload, headers=headers)
+            response.raise_for_status()
+            return {"status": "success", "data": response.json()}
+        except httpx.HTTPStatusError as e:
+            return {"status": "error", "detail": f"HTTP error: {e.response.status_code}"}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+@router.post("/mcp/callbacks/ci", name="MCP CI Callback")
+async def mcp_build_callback(
+        request: MCPCICDRequest
+):
+    """Callback endpoint for CI build status"""
+    logger.info(f"[CI CALLBACK] ID={request.id}, "
+                f"Project={request.project_full_name} ({request.project_full_path}), "
+                f"Status={request.status}, Version={request.version}")
+
+    result = {
+        "id": request.id,
+        "project_full_path": request.project_full_path,
+        "project_full_name": request.project_full_name,
+        "status": request.status,
+        "version": request.version
+    }
+
+    return {
+        "success": True,
+        "message": "CI callback received",
+        "data": result
+    }
+
+@router.post("/mcp/callbacks/cd", name="MCP CD Callback")
+async def mcp_deploy_callback(
+        request: MCPCICDRequest
+):
+    """Callback endpoint for CI build status"""
+    logger.info(f"[CI CALLBACK] ID={request.id}, "
+                f"Project={request.project_full_name} ({request.project_full_path}), "
+                f"Status={request.status}, Version={request.port}")
+
+    result = {
+        "id": request.id,
+        "project_full_path": request.project_full_path,
+        "project_full_name": request.project_full_name,
+        "status": request.status,
+        "port": request.port
+    }
+
+    return {
+        "success": True,
+        "message": "CD callback received",
+        "data": result
+    }
