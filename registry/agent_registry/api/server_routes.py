@@ -1,13 +1,16 @@
+import json
 import logging
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 
 import uuid
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 from ..services.server_service import server_service
+from ..services.message_service import message_service
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,9 @@ class AgentAuthRequest(BaseModel):
 
 class AgentFetchCardRequest(BaseModel):
     agent_url: str
+
+class MessageRequest(BaseModel):
+    message: str
 
 
 class Provider(BaseModel):
@@ -410,6 +416,39 @@ async def update_a2a_agent(
         status_code=200 if result["success"] else 400,
         content=result
     )
+
+
+
+@router.post("/a2a/{agent_id}/message", name="Send Message to Agent")
+async def send_message_to_agent(
+        agent_id: str,
+        request: MessageRequest
+):
+    """Send a message to an A2A agent and get response"""
+
+    async def generate_events():
+        async for event in message_service.send_message_to_a2a_agent_stream(agent_id, request.message):
+            # Server-Sent Events 형식으로 전송
+            yield f"data: {json.dumps(event.dict(), default=str)}\n\n"
+
+        # 스트림 종료
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+        }
+    )
+
+
+
+
 
 
 

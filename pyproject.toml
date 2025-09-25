@@ -35,6 +35,7 @@ dependencies = [
     "langchain-anthropic>=0.3.17",
     "matplotlib>=3.10.5",
     "psutil>=6.1.0",
+    "a2a-sdk>=0.3.7"
 ]
 
 [project.optional-dependencies]

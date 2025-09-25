@@ -7,6 +7,12 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "a2a-sdk"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = []
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -968,6 +974,7 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
+    { name = "a2a-sdk" },
 ]
 
 [package.optional-dependencies]
