@@ -4,8 +4,8 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
 import uuid
-from pydantic import BaseModel
-from typing import List, Dict, Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 
 from ..services.server_service import server_service
 
@@ -40,8 +40,23 @@ class AgentAuthRequest(BaseModel):
 class AgentFetchCardRequest(BaseModel):
     agent_url: str
 
+
+class Provider(BaseModel):
+    organization: Optional[str] = Field(None, description="Provider organization")
+
+class Skill(BaseModel):
+    id: Optional[str] = Field(None, description="Unique skill id")
+    name: Optional[str] = Field(None, description="Human readable skill name")
+    description: Optional[str] = Field(None, description="Skill description")
+
 class AgentAgentCardRequest(BaseModel):
-    agentCard: Optional[List[dict]]
+    protocolVersion: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    version: Optional[str] = None
+    skills: Optional[List[Skill]] = None
+    provider: Optional[Provider] = None
 
 @router.get("/a2a", name="List A2A Agents")
 async def get_all_a2a_agents():
@@ -354,8 +369,47 @@ async def update_a2a_agent(
         request: AgentAgentCardRequest
 ):
     """Validate an A2A agent card"""
+    errors: List[str] = []
+    warnings: List[str] = []
 
+    # 필수 필드
+    if not request.protocolVersion:
+        errors.append("Protocol version is required")
+    if not request.name:
+        errors.append("Agent name is required")
+    if not request.description:
+        errors.append("Agent description is required")
+    if not request.url:
+        errors.append("Service endpoint URL is required")
 
+    # 선택이지만 권장되는 필드
+    if not request.skills or len(request.skills) == 0:
+        warnings.append("No skills defined")
+    if not request.version:
+        warnings.append("Agent version not specified")
+    if not (request.provider and request.provider.organization):
+        warnings.append("Provider organization not specified")
+
+    # 스킬 상세 검증
+    if request.skills:
+        for idx, skill in enumerate(request.skills, start=1):
+            if not skill.id:
+                if not skill.id:
+                    errors.append(f"Skill {idx}: ID is required")
+                if not skill.name:
+                    errors.append(f"Skill {idx}: Name is required")
+                if not skill.description:
+                    errors.append(f"Skill {idx}: Description is required")
+
+    result = {
+        "success": len(errors) == 0,
+        "message": errors
+    }
+
+    return JSONResponse(
+        status_code=200 if result["success"] else 400,
+        content=result
+    )
 
 
 
