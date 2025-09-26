@@ -189,7 +189,7 @@ async def update_a2a_agent(
             }
         )
 
-    logger.info(f"agent '{body.agentCardUrl}' ({agent_info["id"]}) updated '")
+    logger.info(f"agent '{body.agentCardUrl}' ({agent_id}) updated '")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -428,8 +428,18 @@ async def send_message_to_agent(
 
     async def generate_events():
         async for event in message_service.send_message_to_a2a_agent_stream(agent_id, request.message):
-            # Server-Sent Events 형식으로 전송
-            yield f"data: {json.dumps(event.dict(), default=str)}\n\n"
+            # event가 Pydantic 모델이면 dict로 변환
+            if hasattr(event, "model_dump"):
+                payload = event.model_dump(mode="json", exclude_none=True)
+            elif isinstance(event, dict):
+                payload = event
+            else:
+                payload = {"raw": str(event)}
+
+            logger.debug("SSE payload: %s", payload)
+
+            # SSE 규격: 'data: ' + 본문 + '\n\n'
+            yield f"data: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"  # [web:1][web:110]
 
         # 스트림 종료
         yield "data: [DONE]\n\n"
