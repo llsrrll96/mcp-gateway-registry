@@ -1,10 +1,11 @@
+import json
 import httpx
 import asyncio
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status, Cookie
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
 
 import uuid
 from pydantic import BaseModel
@@ -14,7 +15,7 @@ from typing import List, Dict, Optional
 from ...auth.dependencies import web_auth, api_auth, enhanced_auth
 from ..services.server_service import server_service
 from ..core.config import settings
-
+from ..services.repo_service import repo_service
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +250,7 @@ async def edit_server_submit(
             }
         )
 
-    logger.info(f"Server '{body.name}' ({server_info["id"]}) updated '")
+    logger.info(f"Server '{body.name}' ({server_id}) updated '")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -479,6 +480,7 @@ async def mcp_build(
         except Exception as e:
             return {"status": "error", "detail": str(e)}
 
+# 배포 테스트용
 @router.post("/mcp/deploy", name="MCP CD")
 async def mcp_deploy(
         request: MCPCICDRequest
@@ -498,11 +500,11 @@ async def mcp_deploy(
         try:
             response = await client.post(settings.CD_BUILD_URL, json=payload, headers=headers)
             response.raise_for_status()
-            return {"status": "success", "data": response.json()}
+            return {"status": True, "data": response.json()}
         except httpx.HTTPStatusError as e:
-            return {"status": "error", "detail": f"HTTP error: {e.response.status_code}"}
+            return {"status": False, "message": f"HTTP error: {e.response.status_code}"}
         except Exception as e:
-            return {"status": "error", "detail": str(e)}
+            return {"status": False, "message": str(e)}
 
 @router.post("/mcp/callbacks/ci", name="MCP CI Callback")
 async def mcp_build_callback(
@@ -513,7 +515,8 @@ async def mcp_build_callback(
                 f"Project={request.project_full_name} ({request.project_full_path}), "
                 f"Status={request.status}, Version={request.version}")
 
-    result = {
+    headers = {"Content-Type": "application/json"}
+    payload = {
         "id": request.id,
         "project_full_path": request.project_full_path,
         "project_full_name": request.project_full_name,
@@ -521,11 +524,18 @@ async def mcp_build_callback(
         "version": request.version
     }
 
-    return {
-        "success": True,
-        "message": "CI callback received",
-        "data": result
-    }
+    # 배포서버에게 배포 요청
+    # 비동기 호출
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(settings.CI_BUILD_URL, json=payload, headers=headers)
+            response.raise_for_status()
+            return {"status": True, "data": response.json()}
+        except httpx.HTTPStatusError as e:
+            return {"status": False, "message": f"HTTP error: {e.response.status_code}"}
+        except Exception as e:
+            return {"status": False, "message": str(e)}
+
 
 @router.post("/mcp/callbacks/cd", name="MCP CD Callback")
 async def mcp_deploy_callback(
@@ -549,3 +559,46 @@ async def mcp_deploy_callback(
         "message": "CD callback received",
         "data": result
     }
+
+@router.post("/mcp/run-ci-cd")
+def run_ci_cd(request: MCPCICDRequest):
+    logger.info(f"run_ci_cd: {request}")
+
+    str_uuid = str(uuid.uuid4())
+
+    async def stream():
+        # 1) CI 단계 스트리밍
+        status = ""
+        yield "data: " + json.dumps({
+            "status": "runnging",
+            "data": {
+                "id": str_uuid,
+                "type": "ci",
+            },
+        }) + "\n\n"
+
+
+        async for chunk in repo_service.mcp_ci(request.project_full_path, request.project_full_name, str_uuid):
+        # async for chunk in repo_service.run_ci(str_uuid):
+            logger.info(f"chunk: {chunk}")
+            yield chunk
+
+        # 2) CI 성공 시에만 동일 연결에서 CD 진행
+            if "success" in chunk:  # 마지막 CI 청크가 success일 때만
+                status = "success"
+                async for chunk2 in repo_service.run_cd(str_uuid):
+                    logger.info(f"chunk2: {chunk2}")
+                    yield chunk2
+            else:
+                status = "failed"
+
+        # 3) 종료 이벤트(선택)
+        yield "data: " + json.dumps({
+            "status": status,
+            "data": {
+                "id": str_uuid,
+                "type": "cd",
+            },
+        }) + "\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
